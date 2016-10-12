@@ -323,9 +323,19 @@ def create_access_token(token_id: str):
     token_store = get_token_store()
     team = get_team()
     timeout = 60 * 30  # wait for 30 minutes
-    cont = team.request_authentication(
-        url_for('authenticate', token_id=token_id, _external=True)
-    )
+    if getattr(team, 'allow_callback_url_params', True):
+        redirect_url = url_for(
+            'authenticate',
+            token_id=token_id,
+            _external=True
+        )
+    else:
+        redirect_url = url_for(
+            'oauth2_callback',
+            token_id=token_id,
+            _external=True
+        )
+    cont = team.request_authentication(redirect_url)
     token_store.set(token_id, ('auth-state', cont.state), timeout)
     response = jsonify(next_url=cont.next_url)
     assert isinstance(response, Response)
@@ -367,11 +377,80 @@ def authenticate(token_id: str):
         raise NotFound()
     if not isinstance(state, tuple) or state[0] != 'auth-state':
         raise Forbidden()
+
+
     requested_redirect_url = url_for(
         'authenticate',
         token_id=token_id,
         _external=True
     )
+    try:
+        identity = team.authenticate(
+            state[1],
+            requested_redirect_url,
+            request.environ
+        )
+    except AuthenticationError as e:
+        current_app.logger.debug(e, exc_info=1)
+        raise BadRequest()
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + token_expire
+    token_store.set(token_id, ('token', Token(identity, expires_at)),
+                    timeout=int(token_expire.total_seconds()))
+    return '<!DOCTYPE html>\n' + html.html(
+        html.head(
+            html.meta(charset='utf-8'),
+            html.title('Geofront: Authentication success')
+        ),
+        html.body(
+            html.h1(html.dfn('Geofront:'), ' Authentication success'),
+            html.p('You may close the browser, and go back to the CLI.')
+        )
+    )
+
+
+@app.route('/oauth2_callback/')
+@typechecked
+def oauth2_callback():
+    """Finalize the authentication process.  It will be shown on web browser.
+
+    :status 400: when authentication is failed
+    :status 404: when the given ``token_id`` doesn't exist
+    :status 403: when the ``token_id`` is already finalized
+    :status 200: when authentication is successfully done
+
+    """
+    token_id = request.args.get('token_id', '')
+    token_store = get_token_store()
+    team = get_team()
+    token_expire = app.config['TOKEN_EXPIRE']
+    if not isinstance(token_expire, datetime.timedelta):
+        raise RuntimeError(
+            'TOKEN_EXPIRE configuration must be an instance of '
+            'datetime.timedelta, not {!r}'.format(token_expire)
+        )
+    try:
+        state = token_store.get(token_id)
+        current_app.logger.debug(
+            'stored AuthenticationContinuation.state: %r',
+            state
+        )
+    except TypeError:
+        raise NotFound()
+    if not isinstance(state, tuple) or state[0] != 'auth-state':
+        raise Forbidden()
+
+    if getattr(team, 'allow_callback_url_params', True):
+        requested_redirect_url = url_for(
+            'authenticate',
+            token_id=token_id,
+            _external=True
+        )
+    else:
+        requested_redirect_url = url_for(
+            'oauth2_callback',
+            token_id=token_id,
+            _external=True
+        )
     try:
         identity = team.authenticate(
             state[1],
