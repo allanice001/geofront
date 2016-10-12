@@ -20,7 +20,7 @@ from ..keystore import (DuplicatePublicKeyError, KeyStore,
 from .oauth import OAuth2Team, request
 
 
-__all__ = 'GitlabKeyStore', 'GitLabTeam'
+__all__ = 'GitLabKeyStore', 'GitLabTeam'
 
 
 class GitLabTeam(OAuth2Team):
@@ -77,10 +77,10 @@ class GitLabTeam(OAuth2Team):
         return frozenset(g['name'] for g in response)
 
 
-class GitlabKeyStore(KeyStore):
+class GitLabKeyStore(KeyStore):
     """Use Gitlab account's public keys as key store."""
 
-    LIST_URL = '{0.server_url}/user/keys'
+    LIST_URL = '{0.server_url}/api/v3/user/keys'
     DEREGISTER_URL = LIST_URL + '/{id}'
 
     logger = logging.getLogger(__name__ + '.GitlabKeyStore')
