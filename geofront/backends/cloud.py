@@ -128,6 +128,95 @@ class CloudRemoteSet(collections.abc.Mapping):
         return Remote(self.user, node.public_ips[0], self.port, metadata)
 
 
+class MultiDriverCloudRemoteSet(collections.abc.Mapping):
+    """Libcloud_-backed remote set.  It supports more than 20 cloud providers
+    through the efforts of Libcloud_. ::
+
+        from geofront.backends.cloud import CloudRemoteSet
+        from libcloud.compute.types import Provider
+        from libcloud.compute.providers import get_driver
+
+        driver_cls = get_driver(Provider.EC2_US_WEST)
+        driver = driver_cls('access id', 'secret key')
+        REMOTE_SET = CloudRemoteSet(driver)
+
+    If the given ``driver`` supports metadata feature (for example,
+    AWS EC2, Google Compute Engine, and OpenStack support it)
+    the resulted :class:`~geofront.remote.Remote` objects will
+    fill their :attr:`~geofront.remote.Remote.metadata` as well.
+
+    :param driver: libcloud compute driver
+    :type driver: :class:`libcloud.compute.base.NodeDriver`
+    :param user: the username to :program:`ssh`.
+                 the default is ``'ec2-user'`` which is the default user
+                 of amazon linux ami
+    :type user: :class:`str`
+    :param port: the port number to :program:`ssh`.
+                the default is 22 which is the default :program:`ssh` port
+    :type port: :class:`numbers.Integral`
+
+    .. seealso::
+
+       `Compute`__ --- Libcloud
+          The compute component of libcloud allows you to manage
+          cloud and virtual servers offered by different providers,
+          more than 20 in total.
+
+    .. _Libcloud: http://libcloud.apache.org/
+    __ https://libcloud.readthedocs.org/en/latest/compute/
+
+    .. versionchanged:: 0.2.0
+       It fills :attr:`~geofront.remote.Remote.metadata` of the resulted
+       :class:`~geofront.remote.Remote` objects if the ``driver`` supports.
+
+    """
+
+    @typechecked
+    def __init__(self,
+                 drivers: list,
+                 user: str='ec2-user',
+                 port: numbers.Integral=22) -> None:
+        self.drivers = drivers
+        self.user = user
+        self.port = port
+        self._nodes = None
+        self._node_to_driver = None
+        self._metadata = None
+
+    def _get_nodes(self, refresh: bool=False) -> dict:
+        if refresh or self._nodes is None:
+            self._nodes = {}
+            self._node_to_driver = {}
+            for driver in self.drivers:
+                for node in driver.list_nodes():
+                    if not node.public_ips:
+                        continue
+                    self._nodes[node.name] = node
+                    self._node_to_driver[node.name] = driver
+        return self._nodes
+
+    def __len__(self) -> int:
+        return len(self._get_nodes())
+
+    def __iter__(self) -> typing.Iterator[str]:
+        return iter(self._get_nodes(True))
+
+    def __getitem__(self, alias: str) -> Remote:
+        node = self._get_nodes()[alias]
+        driver = self._node_to_driver[alias]
+        if not supports_metadata(driver):
+            metadata = {}
+        else:
+            if self._metadata is None:
+                self._metadata = {}
+            try:
+                metadata = self._metadata[alias]
+            except KeyError:
+                metadata = get_metadata(driver, node)
+                self._metadata[alias] = metadata
+        return Remote(self.user, node.public_ips[0], self.port, metadata)
+
+
 @singledispatch
 def supports_metadata(driver: NodeDriver) -> bool:
     """Whether this drive type supports metadata?"""
