@@ -1,23 +1,10 @@
 Geofront
 ========
+.. image:: https://travis-ci.org/allanice001/geofront.svg?branch=master
+   :target: https://travis-ci.org/allanice001/geofront
 
-.. image:: https://badges.gitter.im/spoqa/geofront.svg
-   :alt: Join the chat at https://gitter.im/spoqa/geofront
-   :target: https://gitter.im/spoqa/geofront?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
-
-.. image:: https://badge.fury.io/py/Geofront.svg?
-   :target: https://pypi.python.org/pypi/Geofront
-   :alt: Latest PyPI version
-
-.. image:: https://readthedocs.org/projects/geofront/badge/
-   :target: https://geofront.readthedocs.org/
-   :alt: Read the Docs
-
-.. image:: https://travis-ci.org/spoqa/geofront.svg?branch=master
-   :target: https://travis-ci.org/spoqa/geofront
-
-.. image:: https://codecov.io/gh/spoqa/geofront/branch/master/graph/badge.svg
-   :target: https://codecov.io/gh/spoqa/geofront
+.. image:: https://codecov.io/gh/allanice001/geofront/branch/master/graph/badge.svg
+   :target: https://codecov.io/gh/allanice001/geofront
 
 Geofront is a simple SSH key management server.  It helps to maintain servers
 to SSH, and ``authorized_keys`` list for them.  `Read the docs`__ for more
